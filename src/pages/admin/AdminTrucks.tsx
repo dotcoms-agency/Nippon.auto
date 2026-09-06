@@ -2,10 +2,10 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, X, Save, Star, Eye,
-  Upload, ImageIcon, Loader2,
+  Upload, ImageIcon, Loader2, Video,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useTrucks, useBrands, formatPrice, uploadTruckImage } from '@/lib/hooks';
+import { useTrucks, useBrands, formatPrice, uploadTruckImage, uploadTruckVideo } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
 import type { Truck, TruckStatus } from '@/lib/supabase';
 
@@ -169,7 +169,9 @@ function TruckForm({ truck, brands, onClose, lang }: {
   const { t } = useI18n();
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     brand_id: truck?.brand_id || brands[0]?.id || '',
     model: truck?.model || '',
@@ -203,6 +205,16 @@ function TruckForm({ truck, brands, onClose, lang }: {
     setForm({ ...form, image_urls: [...form.image_urls, ...urls] });
     setUploadingImages(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVideo(true);
+    const url = await uploadTruckVideo(file);
+    if (url) setForm({ ...form, video_url: url });
+    setUploadingVideo(false);
+    if (videoInputRef.current) videoInputRef.current.value = '';
   };
 
   const removeImage = (idx: number) => {
@@ -302,7 +314,7 @@ function TruckForm({ truck, brands, onClose, lang }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-slate-300 mb-1">{t('transmission')}</label>
               <select value={form.transmission} onChange={(e) => setForm({ ...form, transmission: e.target.value })} className={inputClass}>
@@ -316,14 +328,6 @@ function TruckForm({ truck, brands, onClose, lang }: {
                 <option value="Diesel" className="bg-navy-900">Diesel</option>
                 <option value="Petrol" className="bg-navy-900">Petrol</option>
                 <option value="Hybrid" className="bg-navy-900">Hybrid</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-300 mb-1">Status</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TruckStatus })} className={inputClass}>
-                <option value="available" className="bg-navy-900">{lang === 'ja' ? '販売中' : 'Available'}</option>
-                <option value="reserved" className="bg-navy-900">{lang === 'ja' ? '予約済み' : 'Reserved'}</option>
-                <option value="sold" className="bg-navy-900">{lang === 'ja' ? '売約済み' : 'Sold'}</option>
               </select>
             </div>
           </div>
@@ -366,10 +370,25 @@ function TruckForm({ truck, brands, onClose, lang }: {
             <p className="text-[10px] text-slate-500">Click the dashed box to upload images. They are stored in Supabase Storage.</p>
           </div>
 
-          {/* Video URL kept as text since video files are large */}
+          {/* Video upload */}
           <div>
-            <label className="block text-xs text-slate-300 mb-1">Video URL</label>
-            <input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} className={inputClass} placeholder="https://..." />
+            <label className="block text-xs text-slate-300 mb-1">{t('uploadVideo')}</label>
+            <div className="flex items-center gap-3">
+              {form.video_url && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-navy-800 text-sm text-slate-300">
+                  <Video className="w-4 h-4 text-electric-400" />
+                  <span className="truncate max-w-[200px]">{form.video_url.split('/').pop()}</span>
+                  <button onClick={() => setForm({ ...form, video_url: '' })} className="text-red-400 hover:text-red-300">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg glass text-white text-sm cursor-pointer hover:bg-navy-700 transition-smooth">
+                {uploadingVideo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploadingVideo ? 'Uploading...' : 'Upload Video'}
+                <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
+              </label>
+            </div>
           </div>
 
           <div>
@@ -393,10 +412,23 @@ function TruckForm({ truck, brands, onClose, lang }: {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-            <input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} className="w-4 h-4 accent-electric-400" />
-            Featured
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-slate-300 mb-1">Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TruckStatus })} className={inputClass}>
+                <option value="available" className="bg-navy-900">{lang === 'ja' ? '販売中' : 'Available'}</option>
+                <option value="reserved" className="bg-navy-900">{lang === 'ja' ? '予約済み' : 'Reserved'}</option>
+                <option value="sold" className="bg-navy-900">{lang === 'ja' ? '売約済み' : 'Sold'}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-300 mb-1">Featured</label>
+              <select value={form.is_featured ? 'yes' : 'no'} onChange={(e) => setForm({ ...form, is_featured: e.target.value === 'yes' })} className={inputClass}>
+                <option value="no" className="bg-navy-900">No</option>
+                <option value="yes" className="bg-navy-900">Yes</option>
+              </select>
+            </div>
+          </div>
 
           <div className="flex gap-3 pt-2">
             <button

@@ -400,6 +400,27 @@ export function useSiteVisits(): { visits: SiteVisit[]; loading: boolean } {
   return { visits, loading };
 }
 
+export function useHomePageStats() {
+  const [stats, setStats] = useState({ trucksSold: 0, totalTrucks: 0, totalViews: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('trucks').select('status, views');
+      const trucks = data || [];
+      setStats({
+        trucksSold: trucks.filter((t: { status: string }) => t.status === 'sold').length,
+        totalTrucks: trucks.length,
+        totalViews: trucks.reduce((sum: number, t: { views: number | null }) => sum + (t.views || 0), 0),
+      });
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return { stats, loading };
+}
+
 export async function submitInquiry(data: {
   name: string;
   email: string;
@@ -457,6 +478,20 @@ export async function uploadBrandLogo(file: File): Promise<string | null> {
     return null;
   }
   const { data: urlData } = supabase.storage.from('brand-logos').getPublicUrl(fileName);
+  return urlData.publicUrl;
+}
+
+export async function uploadTruckVideo(file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop() || 'mp4';
+  const fileName = `video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('truck-videos')
+    .upload(fileName, file, { upsert: false });
+  if (uploadError) {
+    console.warn('Video upload failed:', uploadError.message);
+    return null;
+  }
+  const { data: urlData } = supabase.storage.from('truck-videos').getPublicUrl(fileName);
   return urlData.publicUrl;
 }
 

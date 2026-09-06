@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Award, Truck, ArrowRight, Star, Quote, ChevronDown } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { useFeaturedTrucks, useLatestTrucks, useBrands, useTestimonials } from '@/lib/hooks';
+import { useFeaturedTrucks, useLatestTrucks, useBrands, useTestimonials, useHomePageStats } from '@/lib/hooks';
 import { heroImage } from '@/lib/fallbackData';
 import TruckCard from '@/components/TruckCard';
 import { SkeletonGrid } from '@/components/Skeletons';
@@ -27,6 +27,7 @@ export default function HomePage() {
   const { trucks: latest, loading: latLoading } = useLatestTrucks();
   const { brands } = useBrands();
   const { testimonials } = useTestimonials();
+  const { stats: homeStats } = useHomePageStats();
 
   const whyChoose = [
     { icon: ShieldCheck, title: t('wcTitle1'), desc: t('wcDesc1') },
@@ -118,10 +119,10 @@ export default function HomePage() {
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { value: 500, suffix: '+', label: lang === 'ja' ? '販売実績' : 'Trucks Sold' },
-              { value: 30, suffix: '+', label: lang === 'ja' ? '年の実績' : 'Years Experience' },
+              { value: homeStats.trucksSold, suffix: '', label: lang === 'ja' ? '販売実績' : 'Trucks Sold' },
+              { value: homeStats.totalTrucks, suffix: '', label: lang === 'ja' ? '在庫数' : 'In Stock' },
+              { value: homeStats.totalViews, suffix: '', label: lang === 'ja' ? '総閲覧数' : 'Total Views' },
               { value: 150, suffix: '', label: lang === 'ja' ? '点検項目' : 'Point Inspection' },
-              { value: 100, suffix: '%', label: lang === 'ja' ? '満足度' : 'Satisfaction' },
             ].map((stat, i) => (
               <motion.div
                 key={i}
@@ -211,8 +212,12 @@ export default function HomePage() {
                   to={`/inventory?brand=${brand.id}`}
                   className="group flex flex-col items-center justify-center gap-2 p-4 lg:p-6 glass rounded-xl hover:border-electric-400/40 hover:glow-blue-sm transition-smooth rotating-border"
                 >
-                  <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-xl bg-navy-700 flex items-center justify-center font-display font-bold text-xl lg:text-2xl text-electric-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-                    {brand.name[0]}
+                  <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-xl bg-navy-700 flex items-center justify-center font-display font-bold text-xl lg:text-2xl text-electric-400 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 overflow-hidden">
+                    {brand.logo_url ? (
+                      <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain" />
+                    ) : (
+                      brand.name[0]
+                    )}
                   </div>
                   <span className="text-xs lg:text-sm text-slate-300 group-hover:text-white text-center transition-colors">
                     {lang === 'ja' && brand.name_ja ? brand.name_ja : brand.name}
