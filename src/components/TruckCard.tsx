@@ -15,6 +15,13 @@ export default function TruckCard({ truck, brandName, index = 0 }: Props) {
   const { t, lang } = useI18n();
   const image = truck.image_urls?.[0] || '';
   const displayName = brandName || truck.brand?.name || '';
+  const status = truck.status || (truck.is_sold ? 'sold' : 'available');
+
+  const statusStyles: Record<string, string> = {
+    available: 'bg-electric-400/90 text-navy-950',
+    reserved: 'bg-amber-500/90 text-navy-950',
+    sold: 'bg-red-500/90 text-white',
+  };
 
   return (
     <motion.div
@@ -51,18 +58,12 @@ export default function TruckCard({ truck, brandName, index = 0 }: Props) {
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-electric-400/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
 
             {/* Status badge */}
-            {truck.is_sold ? (
-              <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-red-500/90 text-white text-[10px] font-bold tracking-wide">
-                {t('sold')}
-              </div>
-            ) : (
-              <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-electric-400/90 text-navy-950 text-[10px] font-bold tracking-wide">
-                {t('available')}
-              </div>
-            )}
+            <div className={`absolute top-2 left-2 px-2 py-1 rounded-md text-[10px] font-bold tracking-wide ${statusStyles[status] || statusStyles.available}`}>
+              {t(status)}
+            </div>
 
             {/* Featured badge */}
-            {truck.is_featured && !truck.is_sold && (
+            {truck.is_featured && status !== 'sold' && (
               <div className="absolute top-2 right-2 px-2 py-1 rounded-md glass-strong text-electric-400 text-[10px] font-bold animate-bounce-subtle">
                 ★
               </div>

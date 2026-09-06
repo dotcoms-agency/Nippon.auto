@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, CheckCircle2, Upload } from 'lucide-react';
+import { Save, CheckCircle2, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useSettings } from '@/lib/hooks';
+import { useSettings, uploadCompanyLogo } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
 
 export default function AdminSettings() {
@@ -62,16 +62,14 @@ export default function AdminSettings() {
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'png';
-      const fileName = `logo-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('company-assets')
-        .upload(fileName, file, { upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage
-        .from('company-assets')
-        .getPublicUrl(fileName);
-      setForm({ ...form, logo_url: urlData.publicUrl });
+      const url = await uploadCompanyLogo(file);
+      if (url) {
+        setForm({ ...form, logo_url: url });
+        // Save immediately so the navbar icon updates via realtime
+        if (settings?.id) {
+          await supabase.from('settings').update({ logo_url: url, updated_at: new Date().toISOString() }).eq('id', settings.id);
+        }
+      }
     } catch (err) {
       console.warn('Logo upload failed:', err);
     }
@@ -141,7 +139,7 @@ export default function AdminSettings() {
             </div>
           )}
           <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg glass text-white text-sm font-medium cursor-pointer hover:bg-navy-700 transition-smooth">
-            <Upload className="w-4 h-4" />
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {uploading ? 'Uploading...' : 'Upload Logo'}
             <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
           </label>

@@ -10,6 +10,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+export type TruckStatus = 'available' | 'reserved' | 'sold';
+
 export type Brand = {
   id: string;
   name: string;
@@ -40,6 +42,7 @@ export type Truck = {
   description_ja: string | null;
   is_sold: boolean;
   is_featured: boolean;
+  status: TruckStatus;
   views: number;
   created_at: string;
   brand?: Brand | null;
@@ -82,4 +85,20 @@ export type Settings = {
   business_hours_ja: string | null;
   logo_url: string | null;
   updated_at: string;
+};
+
+export type TruckView = {
+  id: string;
+  truck_id: string | null;
+  viewer_hash: string | null;
+  created_at: string;
+};
+
+export type SiteVisit = {
+  id: string;
+  visit_date: string;
+  unique_visitors: number;
+  total_page_views: number;
+  truck_detail_views: number;
+  created_at: string;
 };

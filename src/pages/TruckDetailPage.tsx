@@ -100,9 +100,14 @@ export default function TruckDetailPage() {
                 </div>
               )}
 
-              {truck.is_sold && (
+              {truck.status === 'sold' && (
                 <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-red-500/90 text-white text-xs font-bold tracking-wide">
                   {t('sold')}
+                </div>
+              )}
+              {truck.status === 'reserved' && (
+                <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-amber-500/90 text-navy-950 text-xs font-bold tracking-wide">
+                  {t('reserved')}
                 </div>
               )}
 
@@ -167,15 +172,15 @@ export default function TruckDetailPage() {
                 {truck.model}
               </h1>
               <div className="mt-3 flex items-center gap-3">
-                {truck.is_sold ? (
-                  <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-sm font-semibold">
-                    {t('sold')}
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 rounded-full bg-electric-400/20 text-electric-400 text-sm font-semibold">
-                    {t('available')}
-                  </span>
-                )}
+                {(() => {
+                  const s = truck.status || (truck.is_sold ? 'sold' : 'available');
+                  const styles: Record<string, string> = {
+                    available: 'bg-electric-400/20 text-electric-400',
+                    reserved: 'bg-amber-500/20 text-amber-400',
+                    sold: 'bg-red-500/20 text-red-400',
+                  };
+                  return <span className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[s] || styles.available}`}>{t(s)}</span>;
+                })()}
                 <span className="text-sm text-slate-400">{truck.views} views</span>
               </div>
             </motion.div>

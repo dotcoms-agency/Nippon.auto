@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Save, Upload, Loader2, ImageIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useBrands } from '@/lib/hooks';
+import { useBrands, uploadBrandLogo } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
 import type { Brand } from '@/lib/supabase';
 
@@ -15,7 +15,6 @@ export default function AdminBrands() {
   const handleDelete = async (id: string) => {
     if (!confirm(t('confirmDelete'))) return;
     await supabase.from('brands').delete().eq('id', id);
-    window.location.reload();
   };
 
   return (
@@ -40,8 +39,12 @@ export default function AdminBrands() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {brands.map((brand) => (
             <div key={brand.id} className="flex items-center gap-3 p-4 glass rounded-xl">
-              <div className="w-12 h-12 rounded-xl bg-navy-700 flex items-center justify-center font-display font-bold text-lg text-electric-400 flex-shrink-0">
-                {brand.name[0]}
+              <div className="w-12 h-12 rounded-xl bg-navy-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {brand.logo_url ? (
+                  <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain" />
+                ) : (
+                  <span className="font-display font-bold text-lg text-electric-400">{brand.name[0]}</span>
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white truncate">{brand.name}</p>
@@ -80,12 +83,24 @@ export default function AdminBrands() {
 function BrandForm({ brand, onClose }: { brand: Brand | null; onClose: () => void }) {
   const { t } = useI18n();
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: brand?.name || '',
     name_ja: brand?.name_ja || '',
     logo_url: brand?.logo_url || '',
     country: brand?.country || 'Japan',
   });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const url = await uploadBrandLogo(file);
+    if (url) setForm({ ...form, logo_url: url });
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -95,7 +110,7 @@ function BrandForm({ brand, onClose }: { brand: Brand | null; onClose: () => voi
       await supabase.from('brands').insert(form);
     }
     setSaving(false);
-    window.location.reload();
+    onClose();
   };
 
   const inputClass = "w-full px-3 py-2 bg-navy-800 rounded-lg text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth";
@@ -133,10 +148,24 @@ function BrandForm({ brand, onClose }: { brand: Brand | null; onClose: () => voi
             <label className="block text-xs text-slate-300 mb-1">Name (JA)</label>
             <input value={form.name_ja} onChange={(e) => setForm({ ...form, name_ja: e.target.value })} className={inputClass} />
           </div>
+
+          {/* Logo upload */}
           <div>
-            <label className="block text-xs text-slate-300 mb-1">Logo URL</label>
-            <input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} className={inputClass} placeholder="https://..." />
+            <label className="block text-xs text-slate-300 mb-1">Logo</label>
+            <div className="flex items-center gap-3">
+              {form.logo_url && (
+                <div className="w-12 h-12 rounded-lg bg-navy-800 overflow-hidden flex-shrink-0">
+                  <img src={form.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                </div>
+              )}
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg glass text-white text-sm cursor-pointer hover:bg-navy-700 transition-smooth">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploading ? 'Uploading...' : 'Upload'}
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+              </label>
+            </div>
           </div>
+
           <div>
             <label className="block text-xs text-slate-300 mb-1">Country</label>
             <input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} className={inputClass} />

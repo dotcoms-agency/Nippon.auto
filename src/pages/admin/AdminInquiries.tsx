@@ -14,13 +14,11 @@ export default function AdminInquiries() {
 
   const updateStatus = async (id: string, status: string) => {
     await supabase.from('inquiries').update({ status }).eq('id', id);
-    window.location.reload();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('confirmDelete'))) return;
     await supabase.from('inquiries').delete().eq('id', id);
-    window.location.reload();
   };
 
   const statusColors: Record<string, string> = {

@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   Truck, DollarSign, Eye, Mail, TrendingUp, CheckCircle2,
-  ArrowRight, Clock,
+  ArrowRight, Clock, Users,
 } from 'lucide-react';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement,
   LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
-import { supabase } from '@/lib/supabase';
-import { useTrucks, useAdminInquiries } from '@/lib/hooks';
+import { useDashboardStats, useSalesChartData, useAdminInquiries } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
-import type { Truck as TruckType, Inquiry } from '@/lib/supabase';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -22,26 +19,32 @@ ChartJS.register(
 
 export default function AdminDashboard() {
   const { t, lang } = useI18n();
-  const { trucks } = useTrucks();
+  const { stats, loading } = useDashboardStats();
+  const { data: chartData } = useSalesChartData();
   const { inquiries } = useAdminInquiries();
 
-  const totalTrucks = trucks.length;
-  const soldTrucks = trucks.filter(tr => tr.is_sold).length;
-  const availableTrucks = totalTrucks - soldTrucks;
-  const newInquiries = inquiries.filter(i => i.status === 'new').length;
-  const totalRevenue = trucks.filter(tr => tr.is_sold).reduce((sum, tr) => sum + (tr.price || 0), 0);
-
-  // Generate monthly data from trucks and inquiries
-  const months = lang === 'ja'
-    ? ['1月','2月','3月','4月','5月','6月','7月','8月','9月']
-    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'];
-
-  const salesData = {
-    labels: months,
+  const statusData = {
+    labels: [t('new'), t('contacted'), t('closed')],
     datasets: [
       {
-        label: lang === 'ja' ? '販売数' : 'Units Sold',
-        data: [3, 5, 4, 7, 6, 8, 5, 9, 6],
+        data: [
+          inquiries.filter(i => i.status === 'new').length,
+          inquiries.filter(i => i.status === 'contacted').length,
+          inquiries.filter(i => i.status === 'closed').length,
+        ],
+        backgroundColor: ['#00d4ff', '#f59e0b', '#10b981'],
+        borderColor: '#0a1628',
+        borderWidth: 3,
+      },
+    ],
+  };
+
+  const salesData = {
+    labels: chartData.labels,
+    datasets: [
+      {
+        label: lang === 'ja' ? '閲覧数' : 'Views',
+        data: chartData.values,
         borderColor: '#00d4ff',
         backgroundColor: 'rgba(0, 212, 255, 0.15)',
         fill: true,
@@ -50,22 +53,6 @@ export default function AdminDashboard() {
         pointBorderColor: '#0a1628',
         pointBorderWidth: 2,
         pointRadius: 5,
-      },
-    ],
-  };
-
-  const statusData = {
-    labels: [t('new'), t('contacted'), t('closed')],
-    datasets: [
-      {
-        data: [
-          inquiries.filter(i => i.status === 'new').length || 5,
-          inquiries.filter(i => i.status === 'contacted').length || 3,
-          inquiries.filter(i => i.status === 'closed').length || 8,
-        ],
-        backgroundColor: ['#00d4ff', '#f59e0b', '#10b981'],
-        borderColor: '#0a1628',
-        borderWidth: 3,
       },
     ],
   };
@@ -100,11 +87,13 @@ export default function AdminDashboard() {
     },
   };
 
-  const stats = [
-    { icon: Truck, label: t('totalTrucks'), value: totalTrucks, color: 'text-electric-400' },
-    { icon: CheckCircle2, label: t('soldTrucks'), value: soldTrucks, color: 'text-green-400' },
-    { icon: DollarSign, label: lang === 'ja' ? '総売上' : 'Revenue', value: `¥${(totalRevenue / 1000000).toFixed(1)}M`, color: 'text-amber-400' },
-    { icon: Mail, label: t('newInquiries'), value: newInquiries, color: 'text-blue-400' },
+  const statsCards = [
+    { icon: Truck, label: t('totalTrucks'), value: stats.totalTrucks, color: 'text-electric-400' },
+    { icon: CheckCircle2, label: t('soldTrucks'), value: stats.soldTrucks, color: 'text-red-400' },
+    { icon: DollarSign, label: lang === 'ja' ? '総売上' : 'Revenue', value: `¥${(stats.totalRevenue / 1000000).toFixed(1)}M`, color: 'text-amber-400' },
+    { icon: Mail, label: t('newInquiries'), value: stats.newInquiries, color: 'text-blue-400' },
+    { icon: Eye, label: lang === 'ja' ? '総閲覧数' : 'Total Views', value: stats.totalViews, color: 'text-green-400' },
+    { icon: Users, label: lang === 'ja' ? 'ユニーク訪問者' : 'Unique Visitors', value: stats.uniqueVisitorsTotal, color: 'text-purple-400' },
   ];
 
   return (
@@ -115,8 +104,8 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        {stats.map((stat, i) => (
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 lg:gap-4">
+        {statsCards.map((stat, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
@@ -125,12 +114,14 @@ export default function AdminDashboard() {
             className="p-4 lg:p-5 glass rounded-2xl"
           >
             <div className="flex items-center justify-between mb-3">
-              <div className={`w-10 h-10 rounded-xl bg-navy-700 flex items-center justify-center`}>
+              <div className="w-10 h-10 rounded-xl bg-navy-700 flex items-center justify-center">
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />
               </div>
               <TrendingUp className="w-4 h-4 text-green-400" />
             </div>
-            <p className="text-2xl lg:text-3xl font-bold text-white">{stat.value}</p>
+            <p className="text-2xl lg:text-3xl font-bold text-white">
+              {loading ? '—' : stat.value}
+            </p>
             <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
           </motion.div>
         ))}
@@ -144,7 +135,9 @@ export default function AdminDashboard() {
           transition={{ delay: 0.2 }}
           className="lg:col-span-2 p-5 glass rounded-2xl"
         >
-          <h2 className="text-sm font-semibold text-white mb-4">{t('salesOverview')}</h2>
+          <h2 className="text-sm font-semibold text-white mb-4">
+            {lang === 'ja' ? '閲覧推移（過去9日間）' : 'Views (Last 9 Days)'}
+          </h2>
           <div className="h-64">
             <Line data={salesData} options={lineOptions} />
           </div>

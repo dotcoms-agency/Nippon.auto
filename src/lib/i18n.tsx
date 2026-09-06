@@ -99,6 +99,7 @@ const dict: Dict = {
   share: { en: 'Share', ja: '共有' },
   sold: { en: 'SOLD', ja: '売約済み' },
   available: { en: 'Available', ja: '販売中' },
+  reserved: { en: 'Reserved', ja: '予約済み' },
   engine: { en: 'Engine', ja: 'エンジン' },
   colorLabel: { en: 'Color', ja: 'カラー' },
   kms: { en: 'km', ja: 'km' },

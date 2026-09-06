@@ -1,31 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from './supabase';
-import type { Brand, Truck, Inquiry, Testimonial, Settings } from './supabase';
-import { fallbackBrands, fallbackTrucks, fallbackTestimonials, fallbackSettings } from './fallbackData';
+import type { Brand, Truck, Inquiry, Testimonial, Settings, SiteVisit } from './supabase';
 
-// Fetch from Supabase; only fall back to mock data on actual network/connection errors,
-// NOT on empty results (an empty table is valid real data, not a failure).
-async function fetchWithFallback<T>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  query: any,
-  fallback: T
-): Promise<T> {
-  try {
-    const { data, error } = await query;
-    if (error) {
-      console.warn('Supabase query error, using fallback:', error.message);
-      return fallback;
-    }
-    if (data === null) return fallback;
-    return data as T;
-  } catch (err) {
-    console.warn('Supabase connection error, using fallback:', err);
-    return fallback;
-  }
-}
-
-// For admin queries — no fallback. Surface errors so admin sees real DB state.
-async function fetchAdmin<T>(
+async function fetchData<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: any
 ): Promise<{ data: T | null; error: string | null }> {
@@ -38,38 +15,60 @@ async function fetchAdmin<T>(
   }
 }
 
+// ---------- Public hooks with realtime ----------
+
 export function useBrands() {
-  const [brands, setBrands] = useState<Brand[]>(fallbackBrands);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchWithFallback(
-      supabase.from('brands').select('*').order('name'),
-      fallbackBrands
-    ).then((data) => {
-      setBrands(data as Brand[]);
+    fetchData<Brand[]>(supabase.from('brands').select('*').order('name')).then(({ data, error: err }) => {
+      setBrands(data || []);
+      setError(err);
       setLoading(false);
     });
+
+    const channel = supabase
+      .channel('brands-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
+        fetchData<Brand[]>(supabase.from('brands').select('*').order('name')).then(({ data }) => {
+          if (data) setBrands(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { brands, loading };
+  return { brands, loading, error };
 }
 
 export function useTrucks() {
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchWithFallback(
-      supabase.from('trucks').select('*, brand:brands(*)').order('created_at', { ascending: false }),
-      fallbackTrucks
-    ).then((data) => {
-      setTrucks(data as Truck[]);
+    fetchData<Truck[]>(supabase.from('trucks').select('*, brand:brands(*)').order('created_at', { ascending: false })).then(({ data, error: err }) => {
+      setTrucks(data || []);
+      setError(err);
       setLoading(false);
     });
+
+    const channel = supabase
+      .channel('trucks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
+        fetchData<Truck[]>(supabase.from('trucks').select('*, brand:brands(*)').order('created_at', { ascending: false })).then(({ data }) => {
+          if (data) setTrucks(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { trucks, loading };
+  return { trucks, loading, error };
 }
 
 export function useFeaturedTrucks() {
@@ -77,13 +76,25 @@ export function useFeaturedTrucks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchWithFallback(
-      supabase.from('trucks').select('*, brand:brands(*)').eq('is_featured', true).eq('is_sold', false).order('created_at', { ascending: false }).limit(6),
-      fallbackTrucks.filter(t => t.is_featured && !t.is_sold)
-    ).then((data) => {
-      setTrucks(data as Truck[]);
+    fetchData<Truck[]>(
+      supabase.from('trucks').select('*, brand:brands(*)').eq('is_featured', true).neq('status', 'sold').order('created_at', { ascending: false }).limit(6)
+    ).then(({ data }) => {
+      setTrucks(data || []);
       setLoading(false);
     });
+
+    const channel = supabase
+      .channel('featured-trucks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
+        fetchData<Truck[]>(
+          supabase.from('trucks').select('*, brand:brands(*)').eq('is_featured', true).neq('status', 'sold').order('created_at', { ascending: false }).limit(6)
+        ).then(({ data }) => {
+          if (data) setTrucks(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return { trucks, loading };
@@ -94,13 +105,25 @@ export function useLatestTrucks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchWithFallback(
-      supabase.from('trucks').select('*, brand:brands(*)').eq('is_sold', false).order('created_at', { ascending: false }).limit(8),
-      fallbackTrucks.filter(t => !t.is_sold).slice(0, 8)
-    ).then((data) => {
-      setTrucks(data as Truck[]);
+    fetchData<Truck[]>(
+      supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false }).limit(8)
+    ).then(({ data }) => {
+      setTrucks(data || []);
       setLoading(false);
     });
+
+    const channel = supabase
+      .channel('latest-trucks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
+        fetchData<Truck[]>(
+          supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false }).limit(8)
+        ).then(({ data }) => {
+          if (data) setTrucks(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return { trucks, loading };
@@ -109,27 +132,40 @@ export function useLatestTrucks() {
 export function useTruck(id: string | undefined) {
   const [truck, setTruck] = useState<Truck | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
       setLoading(false);
       return;
     }
-    fetchWithFallback(
-      supabase.from('trucks').select('*, brand:brands(*)').eq('id', id).maybeSingle(),
-      null
-    ).then((data) => {
-      setTruck(data as Truck | null);
+
+    fetchData<Truck>(supabase.from('trucks').select('*, brand:brands(*)').eq('id', id).maybeSingle()).then(({ data, error: err }) => {
+      setTruck(data);
+      setError(err);
       setLoading(false);
     });
 
     // Increment view count (best-effort)
-    supabase.rpc('increment_views', { truck_id: id }).then(({ error }) => {
-      if (error) console.warn('Failed to increment views:', error.message);
+    supabase.rpc('increment_views', { truck_id: id }).then(({ error: rpcErr }) => {
+      if (rpcErr) console.warn('Failed to increment views:', rpcErr.message);
     });
+
+    const channel = supabase
+      .channel(`truck-${id}-realtime`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks', filter: `id=eq.${id}` }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setTruck(null);
+        } else {
+          setTruck(payload.new as Truck);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  return { truck, loading };
+  return { truck, loading, error };
 }
 
 export function useRelatedTrucks(brandId: string | null, excludeId: string | undefined) {
@@ -141,11 +177,10 @@ export function useRelatedTrucks(brandId: string | null, excludeId: string | und
       setLoading(false);
       return;
     }
-    fetchWithFallback(
-      supabase.from('trucks').select('*, brand:brands(*)').eq('brand_id', brandId).not('id', 'eq', excludeId || '').eq('is_sold', false).limit(4),
-      []
-    ).then((data) => {
-      setTrucks(data as Truck[]);
+    fetchData<Truck[]>(
+      supabase.from('trucks').select('*, brand:brands(*)').eq('brand_id', brandId).not('id', 'eq', excludeId || '').neq('status', 'sold').limit(4)
+    ).then(({ data }) => {
+      setTrucks(data || []);
       setLoading(false);
     });
   }, [brandId, excludeId]);
@@ -154,61 +189,215 @@ export function useRelatedTrucks(brandId: string | null, excludeId: string | und
 }
 
 export function useTestimonials() {
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(fallbackTestimonials);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchWithFallback(
-      supabase.from('testimonials').select('*').order('created_at', { ascending: false }),
-      fallbackTestimonials
-    ).then((data) => {
-      setTestimonials(data as Testimonial[]);
+    fetchData<Testimonial[]>(supabase.from('testimonials').select('*').order('created_at', { ascending: false })).then(({ data }) => {
+      setTestimonials(data || []);
       setLoading(false);
     });
+
+    const channel = supabase
+      .channel('testimonials-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'testimonials' }, () => {
+        fetchData<Testimonial[]>(supabase.from('testimonials').select('*').order('created_at', { ascending: false })).then(({ data }) => {
+          if (data) setTestimonials(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return { testimonials, loading };
 }
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings | null>(fallbackSettings);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchWithFallback(
-      supabase.from('settings').select('*').limit(1).maybeSingle(),
-      fallbackSettings
-    ).then((data) => {
-      setSettings(data as Settings | null);
+    fetchData<Settings>(supabase.from('settings').select('*').limit(1).maybeSingle()).then(({ data }) => {
+      setSettings(data);
       setLoading(false);
     });
+
+    const channel = supabase
+      .channel('settings-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setSettings(null);
+        } else {
+          setSettings(payload.new as Settings);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return { settings, loading };
 }
 
-// Admin hooks — no fallback, surface real errors
+// ---------- Admin hooks ----------
+
 export function useAdminInquiries() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAdmin(
+    fetchData<Inquiry[]>(
       supabase.from('inquiries').select('*, truck:trucks(*, brand:brands(*))').order('created_at', { ascending: false })
     ).then(({ data, error: err }) => {
-      if (err) {
-        setError(err);
-        setInquiries([]);
-      } else {
-        setInquiries((data as Inquiry[]) || []);
-        setError(null);
+      setInquiries(data || []);
+      setError(err);
+      setLoading(false);
+    });
+
+    const channel = supabase
+      .channel('admin-inquiries-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, () => {
+        fetchData<Inquiry[]>(
+          supabase.from('inquiries').select('*, truck:trucks(*, brand:brands(*))').order('created_at', { ascending: false })
+        ).then(({ data }) => {
+          if (data) setInquiries(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const refresh = useCallback(() => {
+    fetchData<Inquiry[]>(
+      supabase.from('inquiries').select('*, truck:trucks(*, brand:brands(*))').order('created_at', { ascending: false })
+    ).then(({ data }) => {
+      if (data) setInquiries(data);
+    });
+  }, []);
+
+  return { inquiries, loading, error, setInquiries, refresh };
+}
+
+// ---------- Analytics hooks ----------
+
+export function useDashboardStats() {
+  const [stats, setStats] = useState({
+    totalTrucks: 0,
+    soldTrucks: 0,
+    availableTrucks: 0,
+    reservedTrucks: 0,
+    totalRevenue: 0,
+    totalViews: 0,
+    newInquiries: 0,
+    totalInquiries: 0,
+    uniqueVisitorsToday: 0,
+    uniqueVisitorsTotal: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [trucksRes, inquiriesRes, viewsRes, visitsRes] = await Promise.all([
+        supabase.from('trucks').select('status, price, views'),
+        supabase.from('inquiries').select('status'),
+        supabase.from('truck_views').select('id, created_at'),
+        supabase.from('site_visits').select('*').order('visit_date', { ascending: false }).limit(30),
+      ]);
+
+      const trucks = trucksRes.data || [];
+      const inquiries = inquiriesRes.data || [];
+      const views = viewsRes.data || [];
+      const visits = visitsRes.data || [];
+
+      const sold = trucks.filter((t: { status: string }) => t.status === 'sold');
+      const available = trucks.filter((t: { status: string }) => t.status === 'available');
+      const reserved = trucks.filter((t: { status: string }) => t.status === 'reserved');
+      const revenue = sold.reduce((sum: number, t: { price: number | null }) => sum + (t.price || 0), 0);
+      const totalViews = trucks.reduce((sum: number, t: { views: number | null }) => sum + (t.views || 0), 0);
+
+      const today = new Date().toISOString().split('T')[0];
+      const uniqueVisitorsToday = visits.find((v: { visit_date: string }) => v.visit_date === today)?.unique_visitors || 0;
+      const uniqueVisitorsTotal = visits.reduce((sum: number, v: { unique_visitors: number }) => sum + (v.unique_visitors || 0), 0);
+
+      setStats({
+        totalTrucks: trucks.length,
+        soldTrucks: sold.length,
+        availableTrucks: available.length,
+        reservedTrucks: reserved.length,
+        totalRevenue: revenue,
+        totalViews,
+        newInquiries: inquiries.filter((i: { status: string }) => i.status === 'new').length,
+        totalInquiries: inquiries.length,
+        uniqueVisitorsToday,
+        uniqueVisitorsTotal,
+      });
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return { stats, loading };
+}
+
+export function useSalesChartData() {
+  const [data, setData] = useState<{ labels: string[]; values: number[] }>({ labels: [], values: [] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      // Get truck views per day for last 9 days
+      const nineDaysAgo = new Date();
+      nineDaysAgo.setDate(nineDaysAgo.getDate() - 8);
+      const { data: viewsData } = await supabase
+        .from('truck_views')
+        .select('created_at')
+        .gte('created_at', nineDaysAgo.toISOString());
+
+      const days: Record<string, number> = {};
+      for (let i = 8; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        days[key] = 0;
       }
+
+      (viewsData || []).forEach((v: { created_at: string }) => {
+        const key = v.created_at.split('T')[0];
+        if (key in days) days[key]++;
+      });
+
+      const labels = Object.keys(days).map(k => {
+        const d = new Date(k);
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+      });
+      const values = Object.values(days);
+
+      setData({ labels, values });
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return { data, loading };
+}
+
+export function useSiteVisits(): { visits: SiteVisit[]; loading: boolean } {
+  const [visits, setVisits] = useState<SiteVisit[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData<SiteVisit[]>(
+      supabase.from('site_visits').select('*').order('visit_date', { ascending: false }).limit(30)
+    ).then(({ data }) => {
+      setVisits(data || []);
       setLoading(false);
     });
   }, []);
 
-  return { inquiries, loading, error, setInquiries };
+  return { visits, loading };
 }
 
 export async function submitInquiry(data: {
@@ -240,4 +429,47 @@ export function formatPrice(price: number | null | undefined): string {
 export function formatMileage(km: number | null | undefined): string {
   if (!km) return '-';
   return `${km.toLocaleString('en-US')} km`;
+}
+
+// Storage upload helpers
+export async function uploadTruckImage(file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const fileName = `truck-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('truck-images')
+    .upload(fileName, file, { upsert: false });
+  if (uploadError) {
+    console.warn('Image upload failed:', uploadError.message);
+    return null;
+  }
+  const { data: urlData } = supabase.storage.from('truck-images').getPublicUrl(fileName);
+  return urlData.publicUrl;
+}
+
+export async function uploadBrandLogo(file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop() || 'png';
+  const fileName = `brand-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('brand-logos')
+    .upload(fileName, file, { upsert: false });
+  if (uploadError) {
+    console.warn('Logo upload failed:', uploadError.message);
+    return null;
+  }
+  const { data: urlData } = supabase.storage.from('brand-logos').getPublicUrl(fileName);
+  return urlData.publicUrl;
+}
+
+export async function uploadCompanyLogo(file: File): Promise<string | null> {
+  const ext = file.name.split('.').pop() || 'png';
+  const fileName = `logo-${Date.now()}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from('company-assets')
+    .upload(fileName, file, { upsert: true });
+  if (uploadError) {
+    console.warn('Logo upload failed:', uploadError.message);
+    return null;
+  }
+  const { data: urlData } = supabase.storage.from('company-assets').getPublicUrl(fileName);
+  return urlData.publicUrl;
 }

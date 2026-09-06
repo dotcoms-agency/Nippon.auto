@@ -17,7 +17,11 @@ export default function Footer() {
           {/* Company */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Truck className="w-6 h-6 text-electric-400" />
+              {settings?.logo_url ? (
+                <img src={settings.logo_url} alt="Logo" className="w-6 h-6 object-contain" />
+              ) : (
+                <Truck className="w-6 h-6 text-electric-400" />
+              )}
               <span className="font-display text-lg font-bold text-white">{companyName}</span>
             </div>
             <p className="text-sm text-slate-400 leading-relaxed">

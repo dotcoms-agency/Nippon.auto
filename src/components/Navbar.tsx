@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { Menu, X, Truck, Globe, ChevronDown } from 'lucide-react';
 import { useI18n, type Lang } from '@/lib/i18n';
-import { useBrands } from '@/lib/hooks';
+import { useBrands, useSettings } from '@/lib/hooks';
 
 export default function Navbar() {
   const { t, lang, setLang } = useI18n();
@@ -12,6 +12,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [brandsOpen, setBrandsOpen] = useState(false);
   const { brands } = useBrands();
+  const { settings } = useSettings();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -50,8 +51,13 @@ export default function Navbar() {
                 <motion.div
                   whileHover={{ rotate: [0, -10, 10, 0] }}
                   transition={{ duration: 0.5 }}
+                  className="relative w-7 h-7"
                 >
-                  <Truck className="relative w-7 h-7 text-electric-400" />
+                  {settings?.logo_url ? (
+                    <img src={settings.logo_url} alt="Logo" className="w-7 h-7 object-contain" />
+                  ) : (
+                    <Truck className="w-7 h-7 text-electric-400" />
+                  )}
                 </motion.div>
               </div>
               <div className="flex flex-col leading-none">
@@ -111,8 +117,12 @@ export default function Navbar() {
                             to={`/inventory?brand=${brand.id}`}
                             className="flex items-center gap-2 p-3 rounded-xl hover:bg-electric-400/10 transition-smooth group"
                           >
-                            <div className="w-10 h-10 rounded-lg bg-navy-700 flex items-center justify-center text-electric-400 font-display font-bold text-lg">
-                              {brand.name[0]}
+                            <div className="w-10 h-10 rounded-lg bg-navy-700 flex items-center justify-center text-electric-400 font-display font-bold text-lg overflow-hidden flex-shrink-0">
+                              {brand.logo_url ? (
+                                <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain" />
+                              ) : (
+                                brand.name[0]
+                              )}
                             </div>
                             <div>
                               <div className="text-sm font-medium text-white group-hover:text-electric-400">
