@@ -168,6 +168,7 @@ const dict: Dict = {
   addBrand: { en: 'Add Brand', ja: 'ブランド追加' },
   companyName: { en: 'Company Name', ja: '会社名' },
   logoUpload: { en: 'Logo Upload', ja: 'ロゴアップロード' },
+  removeLogo: { en: 'Remove Logo', ja: 'ロゴを削除' },
   socialLinks: { en: 'Social Links', ja: 'ソーシャルリンク' },
   languageSettings: { en: 'Language Settings', ja: '言語設定' },
   saveSettings: { en: 'Save Settings', ja: '設定を保存' },

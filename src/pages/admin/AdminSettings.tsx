@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, CheckCircle2, Upload, Loader2 } from 'lucide-react';
+import { Save, CheckCircle2, Upload, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useSettings, uploadCompanyLogo } from '@/lib/hooks';
 import { useI18n } from '@/lib/i18n';
@@ -76,6 +76,13 @@ export default function AdminSettings() {
     setUploading(false);
   };
 
+  const handleRemoveLogo = async () => {
+    setForm({ ...form, logo_url: '' });
+    if (settings?.id) {
+      await supabase.from('settings').update({ logo_url: null, updated_at: new Date().toISOString() }).eq('id', settings.id);
+    }
+  };
+
   const inputClass = "w-full px-3 py-2.5 bg-navy-800 rounded-lg text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth";
   const labelClass = "block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2";
 
@@ -138,11 +145,22 @@ export default function AdminSettings() {
               <img src={form.logo_url} alt="Logo" className="w-full h-full object-contain" />
             </div>
           )}
-          <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg glass text-white text-sm font-medium cursor-pointer hover:bg-navy-700 transition-smooth">
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {uploading ? 'Uploading...' : 'Upload Logo'}
-            <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg glass text-white text-sm font-medium cursor-pointer hover:bg-navy-700 transition-smooth">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {uploading ? 'Uploading...' : 'Upload Logo'}
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </label>
+            {form.logo_url && (
+              <button
+                onClick={handleRemoveLogo}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-red-400 text-sm font-medium hover:bg-red-400/10 transition-smooth"
+              >
+                <Trash2 className="w-4 h-4" />
+                {t('removeLogo')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
