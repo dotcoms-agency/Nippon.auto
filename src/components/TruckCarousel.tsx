@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Fuel, Gauge, Calendar, CheckCircle2, Eye } from 'lucide-react';
@@ -14,13 +14,13 @@ type Props = {
 const AUTO_SPEED = 0.35;
 const AUTO_SPEED_SLOW = 0.25;
 const RESUME_DELAY = 1500;
-const DRAG_THRESHOLD = 8; // px — movement below this counts as a tap, not a drag
+const DRAG_THRESHOLD = 8;
 
 export default function TruckCarousel({ trucks, showViews = false }: Props) {
-  const { t } = useI18n();
   const trackRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
   const offsetRef = useRef(0);
+  const halfWidthRef = useRef(0);
   const isInteractingRef = useRef(false);
   const lastResumeTimerRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -29,31 +29,34 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
 
   const speed = showViews ? AUTO_SPEED_SLOW : AUTO_SPEED;
 
+  // GPU-friendly transform setter — uses translate3d for compositor-only animation
   const setOffset = useCallback((v: number) => {
     offsetRef.current = v;
     if (trackRef.current) {
-      trackRef.current.style.transform = `translateX(${-v}px)`;
+      trackRef.current.style.transform = `translate3d(${-v}px, 0, 0)`;
+    }
+  }, []);
+
+  // Measure half-width once and on resize (not every frame)
+  const measureHalfWidth = useCallback(() => {
+    if (trackRef.current) {
+      halfWidthRef.current = trackRef.current.scrollWidth / 2;
     }
   }, []);
 
   useEffect(() => {
     if (trucks.length === 0) return;
 
-    let halfWidth = 0;
-
-    const measure = () => {
-      if (trackRef.current) {
-        halfWidth = trackRef.current.scrollWidth / 2;
-      }
-    };
-    measure();
-    window.addEventListener('resize', measure);
+    // Delay measurement until images have reserved layout space
+    measureHalfWidth();
+    const resizeObserver = new ResizeObserver(() => measureHalfWidth());
+    if (trackRef.current) resizeObserver.observe(trackRef.current);
 
     const tick = () => {
-      if (!isInteractingRef.current && halfWidth > 0) {
+      if (!isInteractingRef.current && halfWidthRef.current > 0) {
         let next = offsetRef.current + speed;
-        if (next >= halfWidth) {
-          next -= halfWidth;
+        if (next >= halfWidthRef.current) {
+          next -= halfWidthRef.current;
         }
         setOffset(next);
       }
@@ -63,9 +66,9 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('resize', measure);
+      resizeObserver.disconnect();
     };
-  }, [trucks.length, speed, setOffset]);
+  }, [trucks.length, speed, setOffset, measureHalfWidth]);
 
   const scheduleResume = useCallback(() => {
     if (lastResumeTimerRef.current) {
@@ -87,21 +90,16 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
     if (!isInteractingRef.current) return;
     const delta = e.clientX - dragStartRef.current.x;
 
-    if (Math.abs(delta) > DRAG_THRESHOLD) {
-      if (!didDragRef.current) {
-        didDragRef.current = true;
-        setIsDragging(true);
-      }
+    if (Math.abs(delta) > DRAG_THRESHOLD && !didDragRef.current) {
+      didDragRef.current = true;
+      setIsDragging(true);
     }
 
     let next = dragStartRef.current.offset - delta;
-
-    if (trackRef.current) {
-      const halfWidth = trackRef.current.scrollWidth / 2;
-      if (halfWidth > 0) {
-        while (next < 0) next += halfWidth;
-        while (next >= halfWidth) next -= halfWidth;
-      }
+    const hw = halfWidthRef.current;
+    if (hw > 0) {
+      while (next < 0) next += hw;
+      while (next >= hw) next -= hw;
     }
     setOffset(next);
   }, [setOffset]);
@@ -128,7 +126,11 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
         onPointerLeave={onPointerUp}
         onPointerCancel={onPointerUp}
         className={`flex gap-3 sm:gap-4 lg:gap-6 w-max ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ willChange: 'transform', touchAction: 'pan-y' }}
+        style={{
+          willChange: 'transform',
+          touchAction: 'pan-y',
+          transform: `translate3d(0, 0, 0)`,
+        }}
       >
         {looped.map((truck, i) => (
           <CarouselCard
@@ -143,6 +145,13 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
     </div>
   );
 }
+
+// Stable status styles object outside component to avoid re-creation
+const statusStyles: Record<string, string> = {
+  available: 'bg-electric-400/90 text-navy-950',
+  reserved: 'bg-amber-500/90 text-navy-950',
+  sold: 'bg-red-500/90 text-white',
+};
 
 function CarouselCard({
   truck,
@@ -160,19 +169,14 @@ function CarouselCard({
   const displayName = truck.brand?.name || '';
   const status = truck.status || (truck.is_sold ? 'sold' : 'available');
 
-  const statusStyles: Record<string, string> = {
-    available: 'bg-electric-400/90 text-navy-950',
-    reserved: 'bg-amber-500/90 text-navy-950',
-    sold: 'bg-red-500/90 text-white',
-  };
-
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4, delay: Math.min((index % 12) * 0.04, 0.3) }}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: '50px' }}
+      transition={{ duration: 0.3, delay: Math.min((index % 12) * 0.03, 0.2) }}
       className="flex-shrink-0 w-[160px] sm:w-[240px] lg:w-[300px]"
+      style={{ willChange: 'auto' }}
     >
       <Link
         to={`/truck/${truck.id}`}
@@ -191,6 +195,7 @@ function CarouselCard({
                 src={image}
                 alt={`${truck.brand?.name || ''} ${truck.model}`}
                 loading="lazy"
+                decoding="async"
                 draggable={false}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
               />

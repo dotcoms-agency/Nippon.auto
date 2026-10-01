@@ -221,7 +221,7 @@ export default function HomePage() {
       </section>
 
       {/* Popular Brands */}
-      <section className="py-16 bg-navy-900/30">
+      <section className="py-16 bg-navy-900/30 cv-auto">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <motion.h2
             initial={{ opacity: 0, x: -20 }}
@@ -263,7 +263,7 @@ export default function HomePage() {
       </section>
 
       {/* Why Choose Us */}
-      <section className="py-16 lg:py-24 relative">
+      <section className="py-16 lg:py-24 relative cv-auto">
         <div className="absolute inset-0 grid-pattern opacity-30" />
         <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -310,7 +310,7 @@ export default function HomePage() {
       </section>
 
       {/* Latest Arrivals */}
-      <section className="py-16 bg-navy-900/30">
+      <section className="py-16 bg-navy-900/30 cv-auto">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-8">
             <div>
@@ -346,7 +346,7 @@ export default function HomePage() {
 
       {/* Testimonials */}
       {testimonials.length > 0 && (
-        <section className="py-16 lg:py-24 relative overflow-hidden">
+        <section className="py-16 lg:py-24 relative overflow-hidden cv-auto">
           <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-electric-400/5 rounded-full blur-[120px]" />
           <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div
@@ -408,7 +408,7 @@ export default function HomePage() {
       )}
 
       {/* CTA */}
-      <section className="py-16 lg:py-24 relative overflow-hidden">
+      <section className="py-16 lg:py-24 relative overflow-hidden cv-auto">
         <div className="absolute inset-0 bg-gradient-to-r from-navy-800 to-navy-900" />
         <div className="absolute inset-0 grid-pattern opacity-30" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-electric-400/10 rounded-full blur-[120px] animate-glow-pulse" />

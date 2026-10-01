@@ -83,8 +83,7 @@ export default function TruckDetailPage() {
               {images[activeImage] ? (
                 <>
                   <img
-                    src={images[activeImage]}
-                    alt={`${brandName} ${truck.model}`}
+                src={images[activeImage]} alt={`${brandName} ${truck.model}`} decoding="async"
                     className="w-full h-full object-cover"
                   />
                   <button
@@ -153,7 +152,7 @@ export default function TruckDetailPage() {
                         activeImage === i ? 'border-electric-400' : 'border-transparent opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

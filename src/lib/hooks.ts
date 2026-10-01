@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
 import type { Brand, Truck, Inquiry, Testimonial, Settings, SiteVisit } from './supabase';
 
@@ -71,117 +71,124 @@ export function useTrucks() {
   return { trucks, loading, error };
 }
 
+// Shared cache for homepage truck data — single query + single realtime subscription
+// serves all derived slices (all, best-selling, latest, featured).
+
+let _sharedTrucksCache: Truck[] | null = null;
+let _sharedTrucksSubscribed = false;
+const _sharedTrucksListeners = new Set<(trucks: Truck[]) => void>();
+
+function _notifySharedTrucksListeners(trucks: Truck[]) {
+  _sharedTrucksCache = trucks;
+  _sharedTrucksListeners.forEach((fn) => fn(trucks));
+}
+
+async function _refreshSharedTrucks() {
+  const { data } = await fetchData<Truck[]>(
+    supabase.from('trucks').select('*, brand:brands(*)').order('created_at', { ascending: false })
+  );
+  if (data) _notifySharedTrucksListeners(data);
+}
+
+function _ensureSharedTrucksSubscription() {
+  if (_sharedTrucksSubscribed) return;
+  _sharedTrucksSubscribed = true;
+
+  const channel = supabase
+    .channel('shared-trucks-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
+      _refreshSharedTrucks();
+    })
+    .subscribe();
+
+  // Keep ref to channel so it's never GC'd
+  _sharedTrucksChannel = channel;
+}
+
+let _sharedTrucksChannel: ReturnType<typeof supabase.channel> | null = null;
+
 export function useAllTrucks() {
-  const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [trucks, setTrucks] = useState<Truck[]>(_sharedTrucksCache || []);
+  const [loading, setLoading] = useState(_sharedTrucksCache === null);
 
   useEffect(() => {
-    fetchData<Truck[]>(
-      supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false })
-    ).then(({ data }) => {
-      setTrucks(data || []);
+    if (_sharedTrucksCache) {
+      setTrucks(_sharedTrucksCache.filter((t) => t.status !== 'sold'));
       setLoading(false);
-    });
+    }
 
-    const channel = supabase
-      .channel('all-trucks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
-        fetchData<Truck[]>(
-          supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false })
-        ).then(({ data }) => {
-          if (data) setTrucks(data);
-        });
-      })
-      .subscribe();
+    const listener = (all: Truck[]) => {
+      setTrucks(all.filter((t) => t.status !== 'sold'));
+      setLoading(false);
+    };
+    _sharedTrucksListeners.add(listener);
+    _ensureSharedTrucksSubscription();
 
-    return () => { supabase.removeChannel(channel); };
+    if (_sharedTrucksCache === null) {
+      _refreshSharedTrucks();
+    }
+
+    return () => {
+      _sharedTrucksListeners.delete(listener);
+    };
   }, []);
 
   return { trucks, loading };
 }
 
 export function useBestSellingTrucks() {
-  const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [trucks, setTrucks] = useState<Truck[]>(_sharedTrucksCache ? [..._sharedTrucksCache].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12) : []);
+  const [loading, setLoading] = useState(_sharedTrucksCache === null);
 
   useEffect(() => {
-    fetchData<Truck[]>(
-      supabase.from('trucks').select('*, brand:brands(*)').order('views', { ascending: false }).limit(12)
-    ).then(({ data }) => {
-      setTrucks(data || []);
+    const listener = (all: Truck[]) => {
+      setTrucks([...all].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 12));
       setLoading(false);
-    });
+    };
 
-    const channel = supabase
-      .channel('best-selling-trucks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
-        fetchData<Truck[]>(
-          supabase.from('trucks').select('*, brand:brands(*)').order('views', { ascending: false }).limit(12)
-        ).then(({ data }) => {
-          if (data) setTrucks(data);
-        });
-      })
-      .subscribe();
+    if (_sharedTrucksCache) {
+      listener(_sharedTrucksCache);
+    }
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    _sharedTrucksListeners.add(listener);
+    _ensureSharedTrucksSubscription();
 
-  return { trucks, loading };
-}
+    if (_sharedTrucksCache === null) {
+      _refreshSharedTrucks();
+    }
 
-export function useFeaturedTrucks() {
-  const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchData<Truck[]>(
-      supabase.from('trucks').select('*, brand:brands(*)').eq('is_featured', true).neq('status', 'sold').order('created_at', { ascending: false }).limit(6)
-    ).then(({ data }) => {
-      setTrucks(data || []);
-      setLoading(false);
-    });
-
-    const channel = supabase
-      .channel('featured-trucks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
-        fetchData<Truck[]>(
-          supabase.from('trucks').select('*, brand:brands(*)').eq('is_featured', true).neq('status', 'sold').order('created_at', { ascending: false }).limit(6)
-        ).then(({ data }) => {
-          if (data) setTrucks(data);
-        });
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      _sharedTrucksListeners.delete(listener);
+    };
   }, []);
 
   return { trucks, loading };
 }
 
 export function useLatestTrucks() {
-  const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [trucks, setTrucks] = useState<Truck[]>(_sharedTrucksCache ? _sharedTrucksCache.filter((t) => t.status !== 'sold').slice(0, 8) : []);
+  const [loading, setLoading] = useState(_sharedTrucksCache === null);
 
   useEffect(() => {
-    fetchData<Truck[]>(
-      supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false }).limit(8)
-    ).then(({ data }) => {
-      setTrucks(data || []);
+    const listener = (all: Truck[]) => {
+      setTrucks(all.filter((t) => t.status !== 'sold').slice(0, 8));
       setLoading(false);
-    });
+    };
 
-    const channel = supabase
-      .channel('latest-trucks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
-        fetchData<Truck[]>(
-          supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false }).limit(8)
-        ).then(({ data }) => {
-          if (data) setTrucks(data);
-        });
-      })
-      .subscribe();
+    if (_sharedTrucksCache) {
+      listener(_sharedTrucksCache);
+    }
 
-    return () => { supabase.removeChannel(channel); };
+    _sharedTrucksListeners.add(listener);
+    _ensureSharedTrucksSubscription();
+
+    if (_sharedTrucksCache === null) {
+      _refreshSharedTrucks();
+    }
+
+    return () => {
+      _sharedTrucksListeners.delete(listener);
+    };
   }, []);
 
   return { trucks, loading };

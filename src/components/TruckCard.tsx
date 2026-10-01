@@ -42,6 +42,7 @@ export default function TruckCard({ truck, brandName, index = 0 }: Props) {
                 src={image}
                 alt={`${truck.brand?.name || ''} ${truck.model}`}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
             ) : (

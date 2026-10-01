@@ -241,15 +241,29 @@ body {
 
 .truck-carousel-track {
   animation: truckCarousel 40s linear infinite;
+  contain: layout style;
 }
 .truck-carousel-track:hover {
   animation-play-state: paused;
 }
 .truck-carousel-track-slow {
   animation: truckCarousel 60s linear infinite;
+  contain: layout style;
 }
 .truck-carousel-track-slow:hover {
   animation-play-state: paused;
+}
+
+/* GPU compositing hints for animated elements */
+.gpu-transform {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Skip rendering for off-screen sections to save CPU/GPU */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }
 
 /* Grid background pattern */
