@@ -11,9 +11,10 @@ type Props = {
   showViews?: boolean;
 };
 
-const AUTO_SPEED = 0.35; // px per frame (~21px/s)
+const AUTO_SPEED = 0.35;
 const AUTO_SPEED_SLOW = 0.25;
-const RESUME_DELAY = 1500; // ms after interaction before auto-scroll resumes
+const RESUME_DELAY = 1500;
+const DRAG_THRESHOLD = 8; // px — movement below this counts as a tap, not a drag
 
 export default function TruckCarousel({ trucks, showViews = false }: Props) {
   const { t } = useI18n();
@@ -24,7 +25,7 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
   const lastResumeTimerRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, offset: 0 });
-  const [linkDisabled, setLinkDisabled] = useState(false);
+  const didDragRef = useRef(false);
 
   const speed = showViews ? AUTO_SPEED_SLOW : AUTO_SPEED;
 
@@ -35,7 +36,6 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
     }
   }, []);
 
-  // Auto-scroll animation loop
   useEffect(() => {
     if (trucks.length === 0) return;
 
@@ -67,9 +67,7 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
     };
   }, [trucks.length, speed, setOffset]);
 
-  // Pause auto-scroll, schedule resume after idle
   const scheduleResume = useCallback(() => {
-    isInteractingRef.current = false;
     if (lastResumeTimerRef.current) {
       clearTimeout(lastResumeTimerRef.current);
     }
@@ -80,29 +78,36 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     isInteractingRef.current = true;
-    setIsDragging(true);
-    setLinkDisabled(true);
+    didDragRef.current = false;
     dragStartRef.current = { x: e.clientX, offset: offsetRef.current };
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isInteractingRef.current || !dragStartRef.current) return;
+    if (!isInteractingRef.current) return;
     const delta = e.clientX - dragStartRef.current.x;
+
+    if (Math.abs(delta) > DRAG_THRESHOLD) {
+      if (!didDragRef.current) {
+        didDragRef.current = true;
+        setIsDragging(true);
+      }
+    }
+
     let next = dragStartRef.current.offset - delta;
 
     if (trackRef.current) {
       const halfWidth = trackRef.current.scrollWidth / 2;
-      while (next < 0) next += halfWidth;
-      while (next >= halfWidth) next -= halfWidth;
+      if (halfWidth > 0) {
+        while (next < 0) next += halfWidth;
+        while (next >= halfWidth) next -= halfWidth;
+      }
     }
     setOffset(next);
   }, [setOffset]);
 
   const onPointerUp = useCallback(() => {
     setIsDragging(false);
-    // Re-enable link clicks after a short delay so a drag doesn't trigger navigation
-    setTimeout(() => setLinkDisabled(false), 100);
     scheduleResume();
   }, [scheduleResume]);
 
@@ -112,7 +117,6 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
 
   return (
     <div className="relative overflow-hidden">
-      {/* Edge fade gradients */}
       <div className="absolute left-0 top-0 bottom-0 z-10 w-12 sm:w-20 bg-gradient-to-r from-navy-950 to-transparent pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 z-10 w-12 sm:w-20 bg-gradient-to-l from-navy-950 to-transparent pointer-events-none" />
 
@@ -132,7 +136,7 @@ export default function TruckCarousel({ trucks, showViews = false }: Props) {
             truck={truck}
             index={i}
             showViews={showViews}
-            linkDisabled={linkDisabled}
+            didDragRef={didDragRef}
           />
         ))}
       </div>
@@ -144,12 +148,12 @@ function CarouselCard({
   truck,
   index,
   showViews,
-  linkDisabled,
+  didDragRef,
 }: {
   truck: Truck;
   index: number;
   showViews: boolean;
-  linkDisabled: boolean;
+  didDragRef: React.RefObject<boolean>;
 }) {
   const { t } = useI18n();
   const image = truck.image_urls?.[0] || '';
@@ -174,13 +178,13 @@ function CarouselCard({
         to={`/truck/${truck.id}`}
         className="group/card block h-full"
         onClick={(e) => {
-          e.stopPropagation();
-          if (linkDisabled) e.preventDefault();
+          if (didDragRef.current) {
+            e.preventDefault();
+          }
         }}
         draggable={false}
       >
         <div className="relative h-full glass rounded-xl overflow-hidden transition-smooth group-hover/card:border-electric-400/40 group-hover/card:glow-blue-sm group-hover/card:-translate-y-1.5 duration-300">
-          {/* Image */}
           <div className="relative aspect-[4/3] overflow-hidden bg-navy-800">
             {image ? (
               <img
@@ -211,7 +215,6 @@ function CarouselCard({
             )}
           </div>
 
-          {/* Info */}
           <div className="p-3 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
