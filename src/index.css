@@ -234,6 +234,24 @@ body {
   100% { transform: translateX(-50%); }
 }
 
+@keyframes truckCarousel {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.truck-carousel-track {
+  animation: truckCarousel 40s linear infinite;
+}
+.truck-carousel-track:hover {
+  animation-play-state: paused;
+}
+.truck-carousel-track-slow {
+  animation: truckCarousel 60s linear infinite;
+}
+.truck-carousel-track-slow:hover {
+  animation-play-state: paused;
+}
+
 /* Grid background pattern */
 .grid-pattern {
   background-image:

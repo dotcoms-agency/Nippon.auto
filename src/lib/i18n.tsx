@@ -32,6 +32,8 @@ const dict: Dict = {
   browseInventory: { en: 'Browse Inventory', ja: '在庫を見る' },
   contactUs: { en: 'Contact Us', ja: 'お問い合わせ' },
   featuredTrucks: { en: 'Featured Trucks', ja: '注目のトラック' },
+  allTrucks: { en: 'All Trucks', ja: '全トラック' },
+  bestSellingTrucks: { en: 'Best Selling Trucks', ja: '売れ筋トラック' },
   viewAll: { en: 'View All', ja: 'すべて見る' },
   popularBrands: { en: 'Popular Brands', ja: '人気ブランド' },
   whyChooseUs: { en: 'Why Choose Nippon Auto', ja: 'ニッポンオートが選ばれる理由' },

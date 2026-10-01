@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Award, Truck, ArrowRight, Star, Quote, ChevronDown } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { useFeaturedTrucks, useLatestTrucks, useBrands, useTestimonials, useHomePageStats } from '@/lib/hooks';
+import { useAllTrucks, useBestSellingTrucks, useLatestTrucks, useBrands, useTestimonials, useHomePageStats } from '@/lib/hooks';
 import { heroImage } from '@/lib/fallbackData';
 import TruckCard from '@/components/TruckCard';
+import TruckCarousel from '@/components/TruckCarousel';
 import { SkeletonGrid } from '@/components/Skeletons';
 import AnimatedCounter from '@/components/AnimatedCounter';
 
@@ -23,7 +24,8 @@ const itemReveal = {
 
 export default function HomePage() {
   const { t, lang } = useI18n();
-  const { trucks: featured, loading: featLoading } = useFeaturedTrucks();
+  const { trucks: allTrucks, loading: allLoading } = useAllTrucks();
+  const { trucks: bestSelling, loading: bestLoading } = useBestSellingTrucks();
   const { trucks: latest, loading: latLoading } = useLatestTrucks();
   const { brands } = useBrands();
   const { testimonials } = useTestimonials();
@@ -143,7 +145,7 @@ export default function HomePage() {
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-electric-400/30 to-transparent" />
       </section>
 
-      {/* Featured Trucks */}
+      {/* All Trucks Carousel */}
       <section className="py-16 lg:py-24">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-8">
@@ -154,7 +156,7 @@ export default function HomePage() {
                 viewport={{ once: true }}
                 className="font-display text-3xl lg:text-4xl font-bold text-white"
               >
-                {t('featuredTrucks')}
+                {t('allTrucks')}
               </motion.h2>
               <div className="mt-2 h-1 w-20 bg-gradient-to-r from-electric-400 to-transparent" />
             </div>
@@ -166,14 +168,12 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {featLoading ? (
+          {allLoading ? (
             <SkeletonGrid count={6} />
+          ) : allTrucks.length > 0 ? (
+            <TruckCarousel trucks={allTrucks} />
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-              {featured.map((truck, i) => (
-                <TruckCard key={truck.id} truck={truck} index={i} />
-              ))}
-            </div>
+            <p className="text-center text-slate-400 py-8">{t('loading')}</p>
           )}
 
           <div className="mt-6 sm:hidden">
@@ -184,6 +184,39 @@ export default function HomePage() {
               {t('viewAll')} <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Best Selling Trucks Carousel */}
+      <section className="py-16 bg-navy-900/30">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <motion.h2
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="font-display text-3xl lg:text-4xl font-bold text-white"
+              >
+                {t('bestSellingTrucks')}
+              </motion.h2>
+              <div className="mt-2 h-1 w-20 bg-gradient-to-r from-electric-400 to-transparent" />
+            </div>
+            <Link
+              to="/inventory"
+              className="hidden sm:inline-flex items-center gap-1 text-sm text-electric-400 hover:gap-2 transition-all"
+            >
+              {t('viewAll')} <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {bestLoading ? (
+            <SkeletonGrid count={6} />
+          ) : bestSelling.length > 0 ? (
+            <TruckCarousel trucks={bestSelling} showViews />
+          ) : (
+            <p className="text-center text-slate-400 py-8">{t('loading')}</p>
+          )}
         </div>
       </section>
 

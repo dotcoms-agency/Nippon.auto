@@ -71,6 +71,64 @@ export function useTrucks() {
   return { trucks, loading, error };
 }
 
+export function useAllTrucks() {
+  const [trucks, setTrucks] = useState<Truck[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData<Truck[]>(
+      supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false })
+    ).then(({ data }) => {
+      setTrucks(data || []);
+      setLoading(false);
+    });
+
+    const channel = supabase
+      .channel('all-trucks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
+        fetchData<Truck[]>(
+          supabase.from('trucks').select('*, brand:brands(*)').neq('status', 'sold').order('created_at', { ascending: false })
+        ).then(({ data }) => {
+          if (data) setTrucks(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  return { trucks, loading };
+}
+
+export function useBestSellingTrucks() {
+  const [trucks, setTrucks] = useState<Truck[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData<Truck[]>(
+      supabase.from('trucks').select('*, brand:brands(*)').order('views', { ascending: false }).limit(12)
+    ).then(({ data }) => {
+      setTrucks(data || []);
+      setLoading(false);
+    });
+
+    const channel = supabase
+      .channel('best-selling-trucks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trucks' }, () => {
+        fetchData<Truck[]>(
+          supabase.from('trucks').select('*, brand:brands(*)').order('views', { ascending: false }).limit(12)
+        ).then(({ data }) => {
+          if (data) setTrucks(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  return { trucks, loading };
+}
+
 export function useFeaturedTrucks() {
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [loading, setLoading] = useState(true);
