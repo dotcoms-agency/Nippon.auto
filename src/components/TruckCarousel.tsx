@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Fuel, Gauge, Calendar, CheckCircle2, Eye } from 'lucide-react';
@@ -10,30 +11,146 @@ type Props = {
   showViews?: boolean;
 };
 
+const AUTO_SPEED = 0.35; // px per frame (~21px/s)
+const AUTO_SPEED_SLOW = 0.25;
+const RESUME_DELAY = 1500; // ms after interaction before auto-scroll resumes
+
 export default function TruckCarousel({ trucks, showViews = false }: Props) {
   const { t } = useI18n();
+  const trackRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+  const offsetRef = useRef(0);
+  const isInteractingRef = useRef(false);
+  const lastResumeTimerRef = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, offset: 0 });
+  const [linkDisabled, setLinkDisabled] = useState(false);
+
+  const speed = showViews ? AUTO_SPEED_SLOW : AUTO_SPEED;
+
+  const setOffset = useCallback((v: number) => {
+    offsetRef.current = v;
+    if (trackRef.current) {
+      trackRef.current.style.transform = `translateX(${-v}px)`;
+    }
+  }, []);
+
+  // Auto-scroll animation loop
+  useEffect(() => {
+    if (trucks.length === 0) return;
+
+    let halfWidth = 0;
+
+    const measure = () => {
+      if (trackRef.current) {
+        halfWidth = trackRef.current.scrollWidth / 2;
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+
+    const tick = () => {
+      if (!isInteractingRef.current && halfWidth > 0) {
+        let next = offsetRef.current + speed;
+        if (next >= halfWidth) {
+          next -= halfWidth;
+        }
+        setOffset(next);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('resize', measure);
+    };
+  }, [trucks.length, speed, setOffset]);
+
+  // Pause auto-scroll, schedule resume after idle
+  const scheduleResume = useCallback(() => {
+    isInteractingRef.current = false;
+    if (lastResumeTimerRef.current) {
+      clearTimeout(lastResumeTimerRef.current);
+    }
+    lastResumeTimerRef.current = window.setTimeout(() => {
+      isInteractingRef.current = false;
+    }, RESUME_DELAY);
+  }, []);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    isInteractingRef.current = true;
+    setIsDragging(true);
+    setLinkDisabled(true);
+    dragStartRef.current = { x: e.clientX, offset: offsetRef.current };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isInteractingRef.current || !dragStartRef.current) return;
+    const delta = e.clientX - dragStartRef.current.x;
+    let next = dragStartRef.current.offset - delta;
+
+    if (trackRef.current) {
+      const halfWidth = trackRef.current.scrollWidth / 2;
+      while (next < 0) next += halfWidth;
+      while (next >= halfWidth) next -= halfWidth;
+    }
+    setOffset(next);
+  }, [setOffset]);
+
+  const onPointerUp = useCallback(() => {
+    setIsDragging(false);
+    // Re-enable link clicks after a short delay so a drag doesn't trigger navigation
+    setTimeout(() => setLinkDisabled(false), 100);
+    scheduleResume();
+  }, [scheduleResume]);
 
   if (trucks.length === 0) return null;
 
-  // Duplicate the array for seamless infinite loop
   const looped = [...trucks, ...trucks];
 
   return (
-    <div className="relative overflow-hidden group">
+    <div className="relative overflow-hidden">
       {/* Edge fade gradients */}
       <div className="absolute left-0 top-0 bottom-0 z-10 w-12 sm:w-20 bg-gradient-to-r from-navy-950 to-transparent pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 z-10 w-12 sm:w-20 bg-gradient-to-l from-navy-950 to-transparent pointer-events-none" />
 
-      <div className={`flex gap-3 sm:gap-4 lg:gap-6 w-max ${showViews ? 'truck-carousel-track-slow' : 'truck-carousel-track'}`}>
+      <div
+        ref={trackRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className={`flex gap-3 sm:gap-4 lg:gap-6 w-max ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{ willChange: 'transform', touchAction: 'pan-y' }}
+      >
         {looped.map((truck, i) => (
-          <CarouselCard key={`${truck.id}-${i}`} truck={truck} index={i} showViews={showViews} />
+          <CarouselCard
+            key={`${truck.id}-${i}`}
+            truck={truck}
+            index={i}
+            showViews={showViews}
+            linkDisabled={linkDisabled}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function CarouselCard({ truck, index, showViews }: { truck: Truck; index: number; showViews: boolean }) {
+function CarouselCard({
+  truck,
+  index,
+  showViews,
+  linkDisabled,
+}: {
+  truck: Truck;
+  index: number;
+  showViews: boolean;
+  linkDisabled: boolean;
+}) {
   const { t } = useI18n();
   const image = truck.image_urls?.[0] || '';
   const displayName = truck.brand?.name || '';
@@ -56,7 +173,11 @@ function CarouselCard({ truck, index, showViews }: { truck: Truck; index: number
       <Link
         to={`/truck/${truck.id}`}
         className="group/card block h-full"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (linkDisabled) e.preventDefault();
+        }}
+        draggable={false}
       >
         <div className="relative h-full glass rounded-xl overflow-hidden transition-smooth group-hover/card:border-electric-400/40 group-hover/card:glow-blue-sm group-hover/card:-translate-y-1.5 duration-300">
           {/* Image */}
@@ -66,6 +187,7 @@ function CarouselCard({ truck, index, showViews }: { truck: Truck; index: number
                 src={image}
                 alt={`${truck.brand?.name || ''} ${truck.model}`}
                 loading="lazy"
+                draggable={false}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
               />
             ) : (
