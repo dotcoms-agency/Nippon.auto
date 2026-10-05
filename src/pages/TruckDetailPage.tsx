@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -24,15 +24,6 @@ export default function TruckDetailPage() {
   const [inquireOpen, setInquireOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
-
-  const openInquiry = useCallback(() => {
-    const defaultMsg = lang === 'ja'
-      ? `${brandName} ${truck?.model || ''}に興味があります。詳細をご連絡ください。`
-      : `I'm interested in the ${brandName} ${truck?.model || ''}. Please contact me with more details.`;
-    setInquiryForm({ name: '', email: '', phone: '', message: defaultMsg });
-    setInquiryStatus('idle');
-    setInquireOpen(true);
-  }, [lang, brandName, truck?.model]);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   if (loading) return <LoadingScreen />;
@@ -50,6 +41,15 @@ export default function TruckDetailPage() {
   const images = truck.image_urls || [];
   const brandName = lang === 'ja' && truck.brand?.name_ja ? truck.brand.name_ja : truck.brand?.name || '';
   const description = lang === 'ja' && truck.description_ja ? truck.description_ja : truck.description;
+
+  const openInquiry = () => {
+    const defaultMsg = lang === 'ja'
+      ? `${brandName} ${truck.model}に興味があります。詳細をご連絡ください。`
+      : `I'm interested in the ${brandName} ${truck.model}. Please contact me with more details.`;
+    setInquiryForm({ name: '', email: '', phone: '', message: defaultMsg });
+    setInquiryStatus('idle');
+    setInquireOpen(true);
+  };
 
   const scrollGallery = (dir: 'left' | 'right') => {
     if (!galleryRef.current) return;
@@ -78,18 +78,28 @@ export default function TruckDetailPage() {
   return (
     <div className="min-h-screen pb-12">
       {/* Breadcrumb */}
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ease: [0.16, 1, 0.3, 1] }}
+        className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-4"
+      >
         <Link to="/inventory" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-electric-400 transition-smooth">
           <ChevronLeft className="w-4 h-4" />
           {t('backToInventory')}
         </Link>
-      </div>
+      </motion.div>
 
       {/* Gallery + Info */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mt-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
           {/* Image Gallery */}
-          <div className="space-y-3">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-3"
+          >
             {/* Main image */}
             <div className="relative aspect-[4/3] rounded-2xl overflow-hidden glass group">
               {images[activeImage] ? (
@@ -170,10 +180,15 @@ export default function TruckDetailPage() {
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Info */}
-          <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -277,7 +292,7 @@ export default function TruckDetailPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Description + Specs + Features */}
@@ -285,16 +300,28 @@ export default function TruckDetailPage() {
           {/* Description */}
           <div className="lg:col-span-2 space-y-6">
             {description && (
-              <div className="p-6 glass rounded-2xl">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ ease: [0.16, 1, 0.3, 1] }}
+                className="p-6 glass rounded-2xl"
+              >
                 <h2 className="font-display text-xl font-bold text-white mb-3">
                   {lang === 'ja' ? '車両説明' : 'Description'}
                 </h2>
                 <p className="text-sm text-slate-300 leading-relaxed">{description}</p>
-              </div>
+              </motion.div>
             )}
 
             {/* Specifications */}
-            <div className="p-6 glass rounded-2xl">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ ease: [0.16, 1, 0.3, 1] }}
+              className="p-6 glass rounded-2xl"
+            >
               <h2 className="font-display text-xl font-bold text-white mb-4">{t('specifications')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                 {Object.entries(truck.specifications || {}).map(([key, value]) => (
@@ -304,11 +331,17 @@ export default function TruckDetailPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Features */}
             {truck.features && truck.features.length > 0 && (
-              <div className="p-6 glass rounded-2xl">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ ease: [0.16, 1, 0.3, 1] }}
+                className="p-6 glass rounded-2xl"
+              >
                 <h2 className="font-display text-xl font-bold text-white mb-4">{t('features')}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {truck.features.map((feature, i) => (
@@ -325,65 +358,83 @@ export default function TruckDetailPage() {
                     </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Condition */}
             {truck.condition_notes && (
-              <div className="p-6 glass rounded-2xl">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ ease: [0.16, 1, 0.3, 1] }}
+                className="p-6 glass rounded-2xl"
+              >
                 <h2 className="font-display text-xl font-bold text-white mb-3">{t('condition')}</h2>
                 <p className="text-sm text-slate-300 leading-relaxed">{truck.condition_notes}</p>
-              </div>
+              </motion.div>
             )}
           </div>
 
           {/* Sidebar - Inquiry */}
           <div className="space-y-4">
-            <div className="p-6 glass rounded-2xl sticky top-24">
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ ease: [0.16, 1, 0.3, 1] }}
+              className="p-6 glass rounded-2xl sticky top-24"
+            >
               <h3 className="font-display text-lg font-bold text-white mb-4">{t('inquireAbout')}</h3>
               <div className="space-y-3">
                 {settings?.phone && (
-                  <a href={`tel:${settings.phone}`} className="flex items-center gap-3 p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-smooth">
+                  <motion.a whileHover={{ x: 4 }} href={`tel:${settings.phone}`} className="flex items-center gap-3 p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-smooth">
                     <Phone className="w-5 h-5 text-electric-400" />
                     <div>
                       <p className="text-xs text-slate-400">{t('phone')}</p>
                       <p className="text-sm text-white">{settings.phone}</p>
                     </div>
-                  </a>
+                  </motion.a>
                 )}
                 {settings?.email && (
-                  <a href={`mailto:${settings.email}`} className="flex items-center gap-3 p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-smooth">
+                  <motion.a whileHover={{ x: 4 }} href={`mailto:${settings.email}`} className="flex items-center gap-3 p-3 rounded-xl bg-navy-800 hover:bg-navy-700 transition-smooth">
                     <Mail className="w-5 h-5 text-electric-400" />
                     <div>
                       <p className="text-xs text-slate-400">{t('email')}</p>
                       <p className="text-sm text-white truncate">{settings.email}</p>
                     </div>
-                  </a>
+                  </motion.a>
                 )}
                 {settings?.line_url && (
-                  <a href={settings.line_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-[#06C755]/20 hover:bg-[#06C755]/30 transition-smooth">
+                  <motion.a whileHover={{ x: 4 }} href={settings.line_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-[#06C755]/20 hover:bg-[#06C755]/30 transition-smooth">
                     <MessageCircle className="w-5 h-5 text-[#06C755]" />
                     <div>
                       <p className="text-xs text-slate-400">LINE</p>
                       <p className="text-sm text-white">{t('lineContact')}</p>
                     </div>
-                  </a>
+                  </motion.a>
                 )}
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 
         {/* Related Trucks */}
         {!relLoading && related.length > 0 && (
-          <div className="mt-12">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ ease: [0.16, 1, 0.3, 1] }}
+            className="mt-12"
+          >
             <h2 className="font-display text-2xl lg:text-3xl font-bold text-white mb-6">{t('relatedTrucks')}</h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {related.map((tr, i) => (
                 <TruckCard key={tr.id} truck={tr} index={i} />
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -410,17 +461,28 @@ export default function TruckDetailPage() {
       )}
 
       {/* Video modal */}
-      {showVideo && truck.video_url && (
-        <div
-          className="fixed inset-0 z-[100] bg-navy-950/95 flex items-center justify-center p-4"
-          onClick={() => setShowVideo(false)}
-        >
-          <button className="absolute top-4 right-4 w-10 h-10 rounded-full glass-strong flex items-center justify-center text-white">
-            <X className="w-5 h-5" />
-          </button>
-          <video src={truck.video_url} controls autoPlay className="max-w-full max-h-full rounded-lg" />
-        </div>
-      )}
+      <AnimatePresence>
+        {showVideo && truck.video_url && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-navy-950/95 flex items-center justify-center p-4"
+            onClick={() => setShowVideo(false)}
+          >
+            <motion.video
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ ease: [0.16, 1, 0.3, 1] }}
+              src={truck.video_url} controls autoPlay className="max-w-full max-h-full rounded-lg"
+            />
+            <button className="absolute top-4 right-4 w-10 h-10 rounded-full glass-strong flex items-center justify-center text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Inquiry modal */}
       <AnimatePresence>
