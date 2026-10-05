@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Fuel, Gauge, Calendar, Cog, Palette, Zap, CheckCircle2,
   Phone, Mail, MessageCircle, Share2, ChevronLeft, ChevronRight,
-  ZoomIn, X, Play,
+  ZoomIn, X, Play, Send, ClipboardList,
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { useTruck, useRelatedTrucks, useSettings, formatPrice, formatMileage } from '@/lib/hooks';
+import { useTruck, useRelatedTrucks, useSettings, submitInquiry, formatPrice, formatMileage } from '@/lib/hooks';
 import TruckCard from '@/components/TruckCard';
 import { LoadingScreen } from '@/components/Skeletons';
 
@@ -21,6 +21,9 @@ export default function TruckDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [inquireOpen, setInquireOpen] = useState(false);
+  const [inquiryForm, setInquiryForm] = useState({ name: '', email: '', phone: '', message: '' });
+  const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const galleryRef = useRef<HTMLDivElement>(null);
 
   if (loading) return <LoadingScreen />;
@@ -212,6 +215,15 @@ export default function TruckDetailPage() {
               ))}
             </div>
 
+            {/* Inquire button */}
+            <button
+              onClick={() => setInquireOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-electric-400 to-electric-500 text-navy-950 font-bold text-sm hover:from-electric-400/90 hover:to-electric-500/90 transition-smooth glow-blue"
+            >
+              <ClipboardList className="w-5 h-5" />
+              {t('inquireAbout')}
+            </button>
+
             {/* Contact buttons */}
             <div className="space-y-3">
               {settings?.phone && (
@@ -397,6 +409,189 @@ export default function TruckDetailPage() {
           <video src={truck.video_url} controls autoPlay className="max-w-full max-h-full rounded-lg" />
         </div>
       )}
+
+      {/* Inquiry modal */}
+      <AnimatePresence>
+        {inquireOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-navy-950/90 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => {
+              if (inquiryStatus !== 'sending') setInquireOpen(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-lg glass-strong rounded-2xl p-6 lg:p-8 my-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h2 className="font-display text-xl lg:text-2xl font-bold text-white">
+                    {t('inquireAbout')}
+                  </h2>
+                  <p className="mt-1 text-sm text-electric-400 font-semibold">
+                    {brandName} {truck.model}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (inquiryStatus !== 'sending') setInquireOpen(false);
+                  }}
+                  className="w-9 h-9 rounded-lg glass flex items-center justify-center text-white hover:text-electric-400 transition-smooth flex-shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Truck summary */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-navy-800/60 mb-6">
+                {images[0] ? (
+                  <img src={images[0]} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-16 h-12 rounded-lg bg-navy-700 flex items-center justify-center flex-shrink-0">
+                    <Fuel className="w-5 h-5 text-slate-600" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 text-xs text-slate-400 space-y-0.5">
+                  <p><span className="text-slate-500">{t('year')}:</span> <span className="text-slate-300">{truck.year || '-'}</span></p>
+                  <p><span className="text-slate-500">{t('mileage')}:</span> <span className="text-slate-300">{formatMileage(truck.mileage)}</span></p>
+                  <p><span className="text-slate-500">{t('price')}:</span> <span className="text-slate-300">{truck.price ? formatPrice(truck.price) : t('priceOnRequest')}</span></p>
+                </div>
+              </div>
+
+              {inquiryStatus === 'success' ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-4 py-8 text-center"
+                >
+                  <div className="w-16 h-16 rounded-full bg-electric-400/15 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-electric-400" />
+                  </div>
+                  <p className="text-sm text-electric-400 font-medium max-w-xs">
+                    {t('messageSent')}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setInquireOpen(false);
+                      setInquiryStatus('idle');
+                      setInquiryForm({ name: '', email: '', phone: '', message: '' });
+                    }}
+                    className="px-6 py-3 rounded-xl glass text-white text-sm font-medium hover:border-electric-400/40 transition-smooth"
+                  >
+                    {t('close')}
+                  </button>
+                </motion.div>
+              ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!inquiryForm.name || !inquiryForm.message) return;
+                    setInquiryStatus('sending');
+                    const ok = await submitInquiry({
+                      ...inquiryForm,
+                      truck_id: truck.id,
+                    });
+                    setInquiryStatus(ok ? 'success' : 'error');
+                    if (ok) {
+                      setInquiryForm({ name: '', email: '', phone: '', message: '' });
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                      {t('yourName')} *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={inquiryForm.name}
+                      onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+                      className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                        {t('yourPhone')}
+                      </label>
+                      <input
+                        type="tel"
+                        value={inquiryForm.phone}
+                        onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
+                        placeholder="Phone / LINE ID"
+                        className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                        {t('yourEmail')}
+                      </label>
+                      <input
+                        type="email"
+                        value={inquiryForm.email}
+                        onChange={(e) => setInquiryForm({ ...inquiryForm, email: e.target.value })}
+                        className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                      {t('yourMessage')} *
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={inquiryForm.message}
+                      onChange={(e) => setInquiryForm({ ...inquiryForm, message: e.target.value })}
+                      placeholder={`I'm interested in the ${brandName} ${truck.model}. Please contact me.`}
+                      className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth resize-none"
+                    />
+                  </div>
+
+                  {inquiryStatus === 'error' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm"
+                    >
+                      {t('messageError')}
+                    </motion.div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={inquiryStatus === 'sending'}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-electric-400 text-navy-950 font-semibold text-sm hover:bg-electric-400/90 transition-smooth glow-blue-sm disabled:opacity-50"
+                  >
+                    {inquiryStatus === 'sending' ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-navy-950 border-t-transparent rounded-full animate-spin" />
+                        {t('loading')}
+                      </span>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        {t('sendMessage')}
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

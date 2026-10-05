@@ -184,6 +184,7 @@ const dict: Dict = {
   imageUrls: { en: 'Image URLs', ja: '画像URL' },
   backToInventory: { en: 'Back to Inventory', ja: '在庫に戻る' },
   backToTrucks: { en: 'Back to Trucks', ja: 'トラック一覧に戻る' },
+  close: { en: 'Close', ja: '閉じる' },
 
   // Misc
   loading: { en: 'Loading...', ja: '読み込み中...' },
