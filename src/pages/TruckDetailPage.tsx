@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -24,6 +24,15 @@ export default function TruckDetailPage() {
   const [inquireOpen, setInquireOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [inquiryStatus, setInquiryStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+
+  const openInquiry = useCallback(() => {
+    const defaultMsg = lang === 'ja'
+      ? `${brandName} ${truck?.model || ''}に興味があります。詳細をご連絡ください。`
+      : `I'm interested in the ${brandName} ${truck?.model || ''}. Please contact me with more details.`;
+    setInquiryForm({ name: '', email: '', phone: '', message: defaultMsg });
+    setInquiryStatus('idle');
+    setInquireOpen(true);
+  }, [lang, brandName, truck?.model]);
   const galleryRef = useRef<HTMLDivElement>(null);
 
   if (loading) return <LoadingScreen />;
@@ -216,13 +225,16 @@ export default function TruckDetailPage() {
             </div>
 
             {/* Inquire button */}
-            <button
-              onClick={() => setInquireOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-electric-400 to-electric-500 text-navy-950 font-bold text-sm hover:from-electric-400/90 hover:to-electric-500/90 transition-smooth glow-blue"
+            <motion.button
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={openInquiry}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-electric-400 to-electric-500 text-navy-950 font-bold text-sm hover:from-electric-400/90 hover:to-electric-500/90 transition-smooth glow-blue relative overflow-hidden"
             >
               <ClipboardList className="w-5 h-5" />
               {t('inquireAbout')}
-            </button>
+              <span className="absolute inset-0 -translate-x-full hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            </motion.button>
 
             {/* Contact buttons */}
             <div className="space-y-3">
@@ -417,21 +429,30 @@ export default function TruckDetailPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-navy-950/90 flex items-center justify-center p-4 overflow-y-auto"
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[100] bg-navy-950/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
             onClick={() => {
               if (inquiryStatus !== 'sending') setInquireOpen(false);
             }}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.92, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-lg glass-strong rounded-2xl p-6 lg:p-8 my-8"
+              exit={{ scale: 0.92, opacity: 0, y: 30 }}
+              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
+              className="w-full max-w-lg glass-strong rounded-2xl p-6 lg:p-8 my-8 relative overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Subtle glow accent */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-electric-400/5 rounded-full blur-3xl pointer-events-none" />
+
               {/* Header */}
-              <div className="flex items-start justify-between mb-6">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-start justify-between mb-6 relative"
+              >
                 <div>
                   <h2 className="font-display text-xl lg:text-2xl font-bold text-white">
                     {t('inquireAbout')}
@@ -440,18 +461,25 @@ export default function TruckDetailPage() {
                     {brandName} {truck.model}
                   </p>
                 </div>
-                <button
+                <motion.button
+                  whileHover={{ rotate: 90, scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
                   onClick={() => {
                     if (inquiryStatus !== 'sending') setInquireOpen(false);
                   }}
                   className="w-9 h-9 rounded-lg glass flex items-center justify-center text-white hover:text-electric-400 transition-smooth flex-shrink-0"
                 >
                   <X className="w-5 h-5" />
-                </button>
-              </div>
+                </motion.button>
+              </motion.div>
 
               {/* Truck summary */}
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-navy-800/60 mb-6">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-center gap-3 p-3 rounded-xl bg-navy-800/60 mb-6 relative"
+              >
                 {images[0] ? (
                   <img src={images[0]} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
                 ) : (
@@ -464,21 +492,37 @@ export default function TruckDetailPage() {
                   <p><span className="text-slate-500">{t('mileage')}:</span> <span className="text-slate-300">{formatMileage(truck.mileage)}</span></p>
                   <p><span className="text-slate-500">{t('price')}:</span> <span className="text-slate-300">{truck.price ? formatPrice(truck.price) : t('priceOnRequest')}</span></p>
                 </div>
-              </div>
+              </motion.div>
 
               {inquiryStatus === 'success' ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col items-center gap-4 py-8 text-center"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ ease: [0.16, 1, 0.3, 1] }}
+                  className="flex flex-col items-center gap-4 py-8 text-center relative"
                 >
-                  <div className="w-16 h-16 rounded-full bg-electric-400/15 flex items-center justify-center">
+                  <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 15 }}
+                    className="w-16 h-16 rounded-full bg-electric-400/15 flex items-center justify-center"
+                  >
                     <CheckCircle2 className="w-8 h-8 text-electric-400" />
-                  </div>
-                  <p className="text-sm text-electric-400 font-medium max-w-xs">
+                  </motion.div>
+                  <motion.p
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                    className="text-sm text-electric-400 font-medium max-w-xs"
+                  >
                     {t('messageSent')}
-                  </p>
-                  <button
+                  </motion.p>
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => {
                       setInquireOpen(false);
                       setInquiryStatus('idle');
@@ -487,7 +531,7 @@ export default function TruckDetailPage() {
                     className="px-6 py-3 rounded-xl glass text-white text-sm font-medium hover:border-electric-400/40 transition-smooth"
                   >
                     {t('close')}
-                  </button>
+                  </motion.button>
                 </motion.div>
               ) : (
                 <form
@@ -504,9 +548,13 @@ export default function TruckDetailPage() {
                       setInquiryForm({ name: '', email: '', phone: '', message: '' });
                     }
                   }}
-                  className="space-y-4"
+                  className="space-y-4 relative"
                 >
-                  <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  >
                     <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                       {t('yourName')} *
                     </label>
@@ -517,10 +565,14 @@ export default function TruckDetailPage() {
                       onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
                       className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth"
                     />
-                  </div>
+                  </motion.div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                    >
                       <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         {t('yourPhone')}
                       </label>
@@ -531,8 +583,12 @@ export default function TruckDetailPage() {
                         placeholder="Phone / LINE ID"
                         className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth"
                       />
-                    </div>
-                    <div>
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.36, ease: [0.16, 1, 0.3, 1] }}
+                    >
                       <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         {t('yourEmail')}
                       </label>
@@ -542,10 +598,14 @@ export default function TruckDetailPage() {
                         onChange={(e) => setInquiryForm({ ...inquiryForm, email: e.target.value })}
                         className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth"
                       />
-                    </div>
+                    </motion.div>
                   </div>
 
-                  <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.44, ease: [0.16, 1, 0.3, 1] }}
+                  >
                     <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                       {t('yourMessage')} *
                     </label>
@@ -554,25 +614,30 @@ export default function TruckDetailPage() {
                       rows={4}
                       value={inquiryForm.message}
                       onChange={(e) => setInquiryForm({ ...inquiryForm, message: e.target.value })}
-                      placeholder={`I'm interested in the ${brandName} ${truck.model}. Please contact me.`}
                       className="w-full px-4 py-3 bg-navy-800 rounded-xl text-sm text-white border border-navy-700 focus:border-electric-400/50 focus:outline-none transition-smooth resize-none"
                     />
-                  </div>
+                  </motion.div>
 
                   {inquiryStatus === 'error' && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
                       className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm"
                     >
                       {t('messageError')}
                     </motion.div>
                   )}
 
-                  <button
+                  <motion.button
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.52, ease: [0.16, 1, 0.3, 1] }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="submit"
                     disabled={inquiryStatus === 'sending'}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-electric-400 text-navy-950 font-semibold text-sm hover:bg-electric-400/90 transition-smooth glow-blue-sm disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-electric-400 text-navy-950 font-semibold text-sm hover:bg-electric-400/90 transition-smooth glow-blue-sm disabled:opacity-50 relative overflow-hidden"
                   >
                     {inquiryStatus === 'sending' ? (
                       <span className="flex items-center gap-2">
@@ -585,7 +650,7 @@ export default function TruckDetailPage() {
                         {t('sendMessage')}
                       </>
                     )}
-                  </button>
+                  </motion.button>
                 </form>
               )}
             </motion.div>
